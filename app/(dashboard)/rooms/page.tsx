@@ -35,7 +35,22 @@ export default function RoomsIndexPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: RoomFormValues) => {
-      await apiClient.post<ApiResponse<Room>>("/api/staff/rooms/", values);
+      let body: FormData | Record<string, unknown>;
+      if (values.image && values.image instanceof File) {
+        const fd = new FormData();
+        fd.append("name", values.name);
+        fd.append("category", values.category);
+        fd.append("capacity", String(values.capacity));
+        fd.append("price", String(values.price));
+        fd.append("status", values.status);
+        if (values.description) fd.append("description", values.description);
+        fd.append("image", values.image);
+        body = fd;
+      } else {
+        const { image: _img, ...rest } = values;
+        body = rest;
+      }
+      await apiClient.post<ApiResponse<Room>>("/api/staff/rooms/", body);
     },
     onSuccess: () => {
       toast.success("Room created");
@@ -55,10 +70,22 @@ export default function RoomsIndexPage() {
       id: number;
       values: RoomFormValues;
     }) => {
-      await apiClient.put<ApiResponse<Room>>(
-        `/api/staff/rooms/${id}/`,
-        values,
-      );
+      let body: FormData | Record<string, unknown>;
+      if (values.image && values.image instanceof File) {
+        const fd = new FormData();
+        fd.append("name", values.name);
+        fd.append("category", values.category);
+        fd.append("capacity", String(values.capacity));
+        fd.append("price", String(values.price));
+        fd.append("status", values.status);
+        if (values.description) fd.append("description", values.description);
+        fd.append("image", values.image);
+        body = fd;
+      } else {
+        const { image: _img, ...rest } = values;
+        body = rest;
+      }
+      await apiClient.put<ApiResponse<Room>>(`/api/staff/rooms/${id}/`, body);
     },
     onSuccess: () => {
       toast.success("Room updated");
