@@ -15,6 +15,7 @@ export interface Room {
   capacity: number;
   price: number;
   status: string;
+  image?: string;
   description?: string;
 }
 
