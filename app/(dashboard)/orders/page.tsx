@@ -5,37 +5,46 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { apiClient } from "../../utils/api";
 import { QUERY_KEYS } from "../../utils/constants";
-import { Reservation } from "../../utils/types";
+import { Order } from "../../utils/types";
 import { Room } from "../../utils/types";
-import { ReservationsTable } from "../../components/tables/ReservationsTable";
+import { MenuItem } from "../../utils/types";
+import { OrdersTable } from "../../components/tables/OrdersTable";
 import {
-  ReservationForm,
-  ReservationFormValues,
-} from "../../components/forms/ReservationForm";
+  OrderForm,
+  OrderFormValues,
+} from "../../components/forms/OrderForm";
 
 interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
+  success?: boolean;
+  message?: string;
+  data?: T;
 }
 
-export default function ReservationsIndexPage() {
+function unwrap<T>(res: { data: T | ApiResponse<T> }): T {
+  const d = res.data as ApiResponse<T>;
+  if (d && typeof d === "object" && "data" in d && d.data !== undefined) {
+    return d.data;
+  }
+  return res.data as T;
+}
+
+export default function OrdersIndexPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "Pending" | "Confirmed" | "Cancelled" | "Completed"
+    "all" | "Pending" | "Confirmed" | "Cancelled"
   >("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingReservation, setEditingReservation] =
-    useState<Reservation | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.reservations,
+    queryKey: QUERY_KEYS.orders,
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Reservation[]>>(
-        "/api/staff/reservations/",
+      const res = await apiClient.get<Order[] | ApiResponse<Order[]>>(
+        "/api/staff/orders/",
       );
-      return res.data.data;
+      const out = unwrap(res);
+      return Array.isArray(out) ? out : [];
     },
   });
 
@@ -45,24 +54,40 @@ export default function ReservationsIndexPage() {
       const res = await apiClient.get<ApiResponse<Room[]>>(
         "/api/staff/rooms/",
       );
-      return res.data.data;
+      return Array.isArray((res.data as ApiResponse<Room[]>)?.data)
+        ? (res.data as ApiResponse<Room[]>).data
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
+    },
+  });
+
+  const { data: menuItems } = useQuery({
+    queryKey: QUERY_KEYS.menu,
+    queryFn: async () => {
+      const res = await apiClient.get<MenuItem[] | ApiResponse<MenuItem[]>>(
+        "/api/staff/menu/",
+      );
+      const out = unwrap(res);
+      return Array.isArray(out) ? out : [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (values: ReservationFormValues) => {
-      await apiClient.post<ApiResponse<Reservation>>(
-        "/api/staff/reservations/",
-        values,
-      );
+    mutationFn: async (values: OrderFormValues) => {
+      await apiClient.post("/api/staff/orders/", values);
     },
     onSuccess: () => {
-      toast.success("Reservation created");
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.reservations });
+      toast.success("Order created");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.orders });
       setIsCreateOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? error?.message ?? "Failed to create reservation");
+      toast.error(
+        error?.response?.data?.message ??
+          error?.message ??
+          "Failed to create order",
+      );
     },
   });
 
@@ -70,48 +95,45 @@ export default function ReservationsIndexPage() {
     mutationFn: async ({
       id,
       values,
-    }: {
-      id: number;
-      values: ReservationFormValues;
-    }) => {
-      await apiClient.put<ApiResponse<Reservation>>(
-        `/api/staff/reservations/${id}/`,
-        values,
-      );
+    }: { id: number; values: OrderFormValues }) => {
+      await apiClient.put(`/api/staff/orders/${id}/`, values);
     },
     onSuccess: () => {
-      toast.success("Reservation updated");
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.reservations });
-      setEditingReservation(null);
+      toast.success("Order updated");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.orders });
+      setEditingOrder(null);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? error?.message ?? "Failed to update reservation");
+      toast.error(
+        error?.response?.data?.message ??
+          error?.message ??
+          "Failed to update order",
+      );
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (reservation: Reservation) => {
-      await apiClient.delete(`/api/staff/reservations/${reservation.id}/`);
+    mutationFn: async (order: Order) => {
+      await apiClient.delete(`/api/staff/orders/${order.id}/`);
     },
     onSuccess: () => {
-      toast.success("Reservation deleted");
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.reservations });
+      toast.success("Order deleted");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.orders });
     },
     onError: (error: any) => {
-      toast.error(error?.message ?? "Unable to delete reservation");
+      toast.error(error?.message ?? "Unable to delete order");
     },
   });
 
-  const filteredReservations = useMemo(() => {
+  const filteredOrders = useMemo(() => {
     if (!data) return [];
-    return data.filter((res) => {
+    return data.filter((order) => {
       const matchesSearch =
         !search ||
-        res.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-        (res.room_name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-        res.email.toLowerCase().includes(search.toLowerCase());
+        order.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+        (order.room_name?.toLowerCase().includes(search.toLowerCase()) ?? false);
       const matchesStatus =
-        statusFilter === "all" ? true : res.status === statusFilter;
+        statusFilter === "all" ? true : order.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [data, search, statusFilter]);
@@ -120,20 +142,18 @@ export default function ReservationsIndexPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Reservations</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage room reservations, check-in, and check-out dates.
+            Manage room service orders and status.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-          >
-            + New Reservation
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+        >
+          + New Order
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -142,7 +162,7 @@ export default function ReservationsIndexPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by customer, room, or email..."
+            placeholder="Search by customer or room..."
             className="w-full rounded-full border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
           />
         </div>
@@ -150,12 +170,7 @@ export default function ReservationsIndexPage() {
           value={statusFilter}
           onChange={(e) =>
             setStatusFilter(
-              e.target.value as
-                | "all"
-                | "Pending"
-                | "Confirmed"
-                | "Cancelled"
-                | "Completed",
+              e.target.value as "all" | "Pending" | "Confirmed" | "Cancelled",
             )
           }
           className="rounded-full border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -164,20 +179,19 @@ export default function ReservationsIndexPage() {
           <option value="Pending">Pending</option>
           <option value="Confirmed">Confirmed</option>
           <option value="Cancelled">Cancelled</option>
-          <option value="Completed">Completed</option>
         </select>
       </div>
 
-      <ReservationsTable
-        items={filteredReservations}
+      <OrdersTable
+        items={filteredOrders}
         loading={isLoading}
-        onEdit={(res) => setEditingReservation(res)}
-        onDelete={(res) => {
+        onEdit={(order) => setEditingOrder(order)}
+        onDelete={(order) => {
           const confirmed = window.confirm(
-            "Are you sure you want to delete this reservation?",
+            "Are you sure you want to delete this order?",
           );
           if (confirmed) {
-            deleteMutation.mutate(res);
+            deleteMutation.mutate(order);
           }
         }}
       />
@@ -188,10 +202,10 @@ export default function ReservationsIndexPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">
-                  New Reservation
+                  New Order
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Create a reservation. Availability is checked before submit.
+                  Create an order. Only active menu items can be selected.
                 </p>
               </div>
               <button
@@ -202,9 +216,9 @@ export default function ReservationsIndexPage() {
                 Esc
               </button>
             </div>
-            <ReservationForm
+            <OrderForm
               rooms={rooms ?? []}
-              existingReservations={data ?? []}
+              menuItems={menuItems ?? []}
               onSubmit={(values) => createMutation.mutateAsync(values)}
               submitLabel={createMutation.isPending ? "Creating..." : "Create"}
             />
@@ -212,33 +226,42 @@ export default function ReservationsIndexPage() {
         </div>
       )}
 
-      {editingReservation && (
+      {editingOrder && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">
-                  Edit Reservation
+                  Edit Order
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Update reservation details and status.
+                  Update order status and menu items.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingReservation(null)}
+                onClick={() => setEditingOrder(null)}
                 className="rounded-full px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
               >
                 Esc
               </button>
             </div>
-            <ReservationForm
+            <OrderForm
               rooms={rooms ?? []}
-              existingReservations={data ?? []}
-              initialValues={editingReservation}
+              menuItems={menuItems ?? []}
+              initialValues={{
+                ...editingOrder,
+                menu_items: Array.isArray(editingOrder.menu_items)
+                  ? editingOrder.menu_items.map((m: unknown) =>
+                      typeof m === "object" && m !== null && "id" in m
+                        ? (m as { id: number }).id
+                        : Number(m),
+                    )
+                  : [],
+              }}
               onSubmit={(values) =>
                 updateMutation.mutateAsync({
-                  id: editingReservation.id,
+                  id: editingOrder.id,
                   values,
                 })
               }

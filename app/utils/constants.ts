@@ -11,5 +11,7 @@ export const QUERY_KEYS = {
   orders: ["orders"] as const,
   reservations: ["reservations"] as const,
   dashboard: ["dashboard"] as const,
+  profile: ["profile"] as const,
+  users: ["users"] as const,
 };
 
