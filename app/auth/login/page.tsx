@@ -6,29 +6,66 @@ import toast from "react-hot-toast";
 import { apiClient } from "../../../utils/api";
 import { authStorage, AuthResponse } from "../../../utils/auth";
 
+interface LoginApiResponse {
+  success?: boolean;
+  message?: string;
+  access?: string;
+  user?: AuthResponse["user"];
+  data?: {
+    setup_required?: boolean;
+    access?: string;
+    user?: AuthResponse["user"];
+  };
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please enter email and password");
+    if (!usernameOrEmail.trim() || !password) {
+      toast.error("Please enter username/email and password");
       return;
     }
     try {
       setLoading(true);
-      const res = await apiClient.post<AuthResponse>("/api/staff/login", {
-        email,
+      const res = await apiClient.post<LoginApiResponse>("/api/staff/login/", {
+        username: usernameOrEmail.trim(),
+        email: usernameOrEmail.trim(),
         password,
       });
-      authStorage.save(res.data);
-      toast.success("Welcome back");
-      router.push("/dashboard");
+      console.log("RAW response:", res.data);
+      const payload = res.data?.data ?? res.data;
+      if (payload?.setup_required) {
+        toast.success("Please create your first staff account");
+        router.push("/auth/setup");
+        return;
+      }
+      if (payload?.access && payload?.user) {
+  authStorage.save({ access: payload.access, user: payload.user });
+  toast.success("Welcome back");
+  
+  
+  const role = payload.user.role;
+  if (role === "Waiter") {
+    router.push("/waiter");
+  } else if (role === "Receptionist") {
+    router.push("/receptionist");
+  } else {
+    router.push("/dashboard"); // Manager, Accountant
+  }
+  return;
+}
+      toast.error("Invalid response from server");
     } catch (error: any) {
-      toast.error(error.message ?? "Login failed");
+      const msg =
+        error.response?.data?.message ??
+        error.message ??
+        "Login failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -45,20 +82,20 @@ export default function LoginPage() {
             Staff Portal
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Welcome back! Please sign in to continue.
+            Sign in with your username or email. First time? Use default admin (admin / admin123) to set up.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">
-              Email or Username
+              Username or Email
             </label>
             <input
               type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={usernameOrEmail}
+              onChange={(e) => setUsernameOrEmail(e.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="admin@example.com"
+              placeholder="admin or your username"
             />
           </div>
           <div className="space-y-1">

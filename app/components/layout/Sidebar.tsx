@@ -2,20 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { authStorage } from "../../utils/auth";
+import type { StaffRole } from "../../utils/auth";
 
-const navItems = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/rooms", label: "Rooms" },
-  { href: "/reservations", label: "Reservations" },
-  { href: "/orders", label: "Orders" },
-  { href: "/menu", label: "Menu" },
-  { href: "/settings", label: "Settings" },
+const allNavItems = [
+  { href: "/dashboard", label: "Overview", roles: ["Manager", "Receptionist", "Waiter", "Accountant"] as StaffRole[] },
+  { href: "/rooms", label: "Rooms", roles: ["Manager", "Receptionist"] as StaffRole[] },
+  { href: "/reservations", label: "Reservations", roles: ["Manager", "Receptionist"] as StaffRole[] },
+  { href: "/orders", label: "Orders", roles: ["Manager", "Waiter"] as StaffRole[] },
+  { href: "/menu", label: "Menu", roles: ["Manager", "Waiter"] as StaffRole[] },
+  { href: "/settings", label: "Settings", roles: ["Manager", "Receptionist", "Waiter", "Accountant"] as StaffRole[] },
 ];
+
+function getNavItemsForRole(role: StaffRole | string | null) {
+  if (!role) return allNavItems;
+  return allNavItems.filter((item) => item.roles.includes(role as StaffRole));
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [user, setUser] = useState<ReturnType<typeof authStorage.getUser>>(null);
+useEffect(() => {
+  setUser(authStorage.getUser());
+}, []);
+  const navItems = getNavItemsForRole(user?.role ?? null);
 
   return (
     <aside

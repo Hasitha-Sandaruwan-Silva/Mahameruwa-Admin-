@@ -3,6 +3,8 @@ export const API_BASE_URL =
 
 export const STORAGE_KEYS = {
   auth: "mahameruwa_staff_auth",
+  accessToken: "mahameruwa_staff_access_token",
+  staffUser: "mahameruwa_staff_user",
 } as const;
 
 export const QUERY_KEYS = {

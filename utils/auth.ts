@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from "./constants";
 
-export type StaffRole = "Manager" | "Staff";
+export type StaffRole = "Manager" | "Receptionist" | "Waiter" | "Accountant";
 
 export interface StaffUser {
   id?: number;

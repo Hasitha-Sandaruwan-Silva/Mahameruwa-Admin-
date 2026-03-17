@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "./constants";
+import { authStorage } from "./auth"; 
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -8,14 +9,27 @@ export const apiClient = axios.create({
   },
 });
 
+
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = authStorage.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Allow callers to handle errors; we just normalize message here.
+   
     if (error.response?.data?.detail) {
       error.message = error.response.data.detail as string;
     }
     return Promise.reject(error);
   },
 );
-
