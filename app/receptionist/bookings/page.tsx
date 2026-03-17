@@ -5,29 +5,28 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../utils/api";
 import toast from "react-hot-toast";
 
-// ==================== TYPES ====================
-
-interface Booking {
-  id: number;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  room_number: string;
-  room_type: string;
-  check_in: string;
-  check_out: string;
-  total_price: number;
-  status: "active" | "checked_in" | "checked_out" | "cancelled";
-  payment_status: "pending" | "partial" | "paid";
-  created_at: string;
-}
-
 interface ApiResponse<T> {
   success: boolean;
+  message?: string;
   data: T;
 }
 
-type FilterType = "all" | "active" | "checked_in" | "checked_out" | "cancelled";
+type BookingStatus = "Pending" | "Confirmed" | "Cancelled" | string;
+
+interface Booking {
+  id: number;
+  full_name: string;
+  email: string;
+  check_in: string;
+  check_out?: string;
+  guests: number;
+  status: BookingStatus;
+  room_number: string;
+  room_category: string;
+  created_at?: string;
+}
+
+type FilterType = "all" | "Pending" | "Confirmed" | "Cancelled";
 
 // ==================== MAIN COMPONENT ====================
 
@@ -44,49 +43,30 @@ export default function BookingsPage() {
     queryKey: ["bookings"],
     queryFn: async () => {
       const res = await apiClient.get<ApiResponse<Booking[]>>(
-        "/api/staff/bookings/"
+        "/api/staff/bookings/",
       );
-      return res.data.data;
+      return res.data.data ?? [];
     },
   });
 
   // Update booking status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await apiClient.patch(`/api/staff/bookings/${id}/status/`, {
+    mutationFn: async ({ id, status }: { id: number; status: BookingStatus }) => {
+      const res = await apiClient.patch<ApiResponse<unknown>>(
+        `/api/staff/bookings/${id}/update-status/`,
+        {
         status,
-      });
+        },
+      );
       return res.data;
     },
     onSuccess: () => {
       toast.success("Booking status updated!");
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
-    onError: () => {
-      toast.error("Failed to update status");
-    },
-  });
-
-  // Update payment status mutation
-  const updatePaymentMutation = useMutation({
-    mutationFn: async ({
-      id,
-      payment_status,
-    }: {
-      id: number;
-      payment_status: string;
-    }) => {
-      const res = await apiClient.patch(`/api/staff/bookings/${id}/payment/`, {
-        payment_status,
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success("Payment status updated!");
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-    },
-    onError: () => {
-      toast.error("Failed to update payment status");
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Failed to update status";
+      toast.error(message);
     },
   });
 
@@ -95,35 +75,26 @@ export default function BookingsPage() {
     const matchesFilter = filter === "all" ? true : booking.status === filter;
     const matchesSearch =
       searchTerm === "" ||
-      booking.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.customer_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.room_number.toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
 
   // Status colors
-  const statusColors: Record<Booking["status"], string> = {
-    active: "bg-blue-100 text-blue-700",
-    checked_in: "bg-emerald-100 text-emerald-700",
-    checked_out: "bg-slate-100 text-slate-700",
-    cancelled: "bg-red-100 text-red-700",
-  };
-
-  // Payment status colors
-  const paymentColors: Record<Booking["payment_status"], string> = {
-    pending: "bg-amber-100 text-amber-700",
-    partial: "bg-orange-100 text-orange-700",
-    paid: "bg-green-100 text-green-700",
+  const statusColors: Record<string, string> = {
+    Pending: "bg-amber-100 text-amber-700",
+    Confirmed: "bg-emerald-100 text-emerald-700",
+    Cancelled: "bg-red-100 text-red-700",
   };
 
   // Filter tabs
   const filterTabs: { key: FilterType; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "active", label: "Active" },
-    { key: "checked_in", label: "Checked In" },
-    { key: "checked_out", label: "Checked Out" },
-    { key: "cancelled", label: "Cancelled" },
+    { key: "Pending", label: "Pending" },
+    { key: "Confirmed", label: "Confirmed" },
+    { key: "Cancelled", label: "Cancelled" },
   ];
 
   // Get count for filter
@@ -133,13 +104,8 @@ export default function BookingsPage() {
   };
 
   // Handle status update
-  const handleStatusUpdate = (id: number, status: string) => {
+  const handleStatusUpdate = (id: number, status: BookingStatus) => {
     updateStatusMutation.mutate({ id, status });
-  };
-
-  // Handle payment update
-  const handlePaymentUpdate = (id: number, payment_status: string) => {
-    updatePaymentMutation.mutate({ id, payment_status });
   };
 
   return (
@@ -191,21 +157,20 @@ export default function BookingsPage() {
             text: "text-blue-700",
           },
           {
-            label: "Active",
-            value: bookings.filter((b) => b.status === "active").length,
+            label: "Pending",
+            value: bookings.filter((b) => b.status === "Pending").length,
             color: "bg-emerald-50",
             text: "text-emerald-700",
           },
           {
-            label: "Checked In",
-            value: bookings.filter((b) => b.status === "checked_in").length,
+            label: "Confirmed",
+            value: bookings.filter((b) => b.status === "Confirmed").length,
             color: "bg-amber-50",
             text: "text-amber-700",
           },
           {
-            label: "Pending Payment",
-            value: bookings.filter((b) => b.payment_status === "pending")
-              .length,
+            label: "Cancelled",
+            value: bookings.filter((b) => b.status === "Cancelled").length,
             color: "bg-red-50",
             text: "text-red-700",
           },
@@ -254,7 +219,7 @@ export default function BookingsPage() {
                   Customer
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Contact
+                  Email
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Room
@@ -266,13 +231,10 @@ export default function BookingsPage() {
                   Check-out
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Price
+                  Guests
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Status
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Payment
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Actions
@@ -318,57 +280,40 @@ export default function BookingsPage() {
 
                     {/* Customer Name */}
                     <td className="px-4 py-3 text-slate-700">
-                      {booking.customer_name}
+                      {booking.full_name}
                     </td>
 
-                    {/* Contact */}
-                    <td className="px-4 py-3 text-slate-600">
-                      <div>{booking.customer_phone}</div>
-                      <div className="text-slate-500">
-                        {booking.customer_email}
-                      </div>
-                    </td>
+                    {/* Email */}
+                    <td className="px-4 py-3 text-slate-600">{booking.email}</td>
 
                     {/* Room */}
                     <td className="px-4 py-3 text-slate-700">
                       <div className="font-medium">{booking.room_number}</div>
-                      <div className="text-slate-500">{booking.room_type}</div>
+                      <div className="text-slate-500">{booking.room_category}</div>
                     </td>
 
                     {/* Check-in */}
                     <td className="px-4 py-3 text-slate-700">
-                      {new Date(booking.check_in).toLocaleDateString()}
+                      {booking.check_in}
                     </td>
 
                     {/* Check-out */}
                     <td className="px-4 py-3 text-slate-700">
-                      {new Date(booking.check_out).toLocaleDateString()}
+                      {booking.check_out ?? "—"}
                     </td>
 
-                    {/* Price */}
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      LKR {booking.total_price.toLocaleString()}
-                    </td>
+                    {/* Guests */}
+                    <td className="px-4 py-3 text-slate-700">{booking.guests}</td>
 
                     {/* Status Badge */}
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          statusColors[booking.status]
+                          statusColors[booking.status] ??
+                          "bg-slate-100 text-slate-700"
                         }`}
                       >
-                        {booking.status.replace("_", " ")}
-                      </span>
-                    </td>
-
-                    {/* Payment Status */}
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          paymentColors[booking.payment_status]
-                        }`}
-                      >
-                        {booking.payment_status}
+                        {booking.status}
                       </span>
                     </td>
 
@@ -376,42 +321,29 @@ export default function BookingsPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         
-                        {/* Check-in button */}
-                        {booking.status === "active" && (
+                        {/* Confirm button */}
+                        {booking.status === "Pending" && (
                           <button
                             onClick={() =>
-                              handleStatusUpdate(booking.id, "checked_in")
+                              handleStatusUpdate(booking.id, "Confirmed")
                             }
                             disabled={updateStatusMutation.isPending}
                             className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-medium disabled:opacity-50"
                           >
-                            Check In
+                            Confirm
                           </button>
                         )}
 
-                        {/* Check-out button */}
-                        {booking.status === "checked_in" && (
+                        {/* Cancel button */}
+                        {booking.status !== "Cancelled" && (
                           <button
                             onClick={() =>
-                              handleStatusUpdate(booking.id, "checked_out")
+                              handleStatusUpdate(booking.id, "Cancelled")
                             }
                             disabled={updateStatusMutation.isPending}
-                            className="px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-medium disabled:opacity-50"
+                            className="px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 text-xs font-medium disabled:opacity-50"
                           >
-                            Check Out
-                          </button>
-                        )}
-
-                        {/* Mark as paid */}
-                        {booking.payment_status !== "paid" && (
-                          <button
-                            onClick={() =>
-                              handlePaymentUpdate(booking.id, "paid")
-                            }
-                            disabled={updatePaymentMutation.isPending}
-                            className="px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 text-xs font-medium disabled:opacity-50"
-                          >
-                            Mark Paid
+                            Cancel
                           </button>
                         )}
                       </div>

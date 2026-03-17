@@ -3,45 +3,104 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../../utils/api";
-
-// ==================== TYPES ====================
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  nic: string;
-  address: string;
-  total_bookings: number;
-  total_spent: number;
-  last_visit: string;
-  status: "active" | "inactive";
-  created_at: string;
-}
+import toast from "react-hot-toast";
 
 interface ApiResponse<T> {
   success: boolean;
   data: T;
 }
 
+interface BookingRow {
+  id: number;
+  full_name: string;
+  email: string;
+  check_in: string;
+  check_out: string;
+  guests: number;
+  status: string;
+  room_number: string;
+  room_category: string;
+  created_at: string;
+}
+
+interface CustomerRow {
+  key: string; // email-based key
+  name: string;
+  email: string;
+  phone: string | null;
+  registration_date: string | null;
+  total_bookings: number;
+  last_visit: string | null;
+  statuses: Record<string, number>;
+  bookings: BookingRow[];
+}
+
 // ==================== MAIN COMPONENT ====================
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerRow | null>(null);
 
-  // Fetch customers
+  // We don't have a dedicated customers endpoint in this backend.
+  // So we derive customer list from all bookings.
   const {
     data: customers = [],
     isLoading,
   } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Customer[]>>(
-        "/api/staff/customers/"
+      const res = await apiClient.get<ApiResponse<BookingRow[]>>(
+        "/api/staff/bookings/",
       );
-      return res.data.data;
+      const rows = res.data.data ?? [];
+
+      const byEmail = new Map<string, CustomerRow>();
+      for (const b of rows) {
+        const email = (b.email ?? "").trim().toLowerCase();
+        if (!email) continue;
+        const existing = byEmail.get(email);
+        const name = (b.full_name ?? "").trim();
+        const createdAt = b.created_at ?? null;
+        const lastVisit = b.check_in ?? null;
+
+        if (!existing) {
+          byEmail.set(email, {
+            key: email,
+            name: name || email,
+            email,
+            phone: null,
+            registration_date: createdAt,
+            total_bookings: 1,
+            last_visit: lastVisit,
+            statuses: { [b.status]: 1 },
+            bookings: [b],
+          });
+        } else {
+          existing.total_bookings += 1;
+          existing.bookings.push(b);
+          existing.statuses[b.status] = (existing.statuses[b.status] ?? 0) + 1;
+          if (createdAt && (!existing.registration_date || createdAt < existing.registration_date)) {
+            existing.registration_date = createdAt;
+          }
+          if (lastVisit && (!existing.last_visit || lastVisit > existing.last_visit)) {
+            existing.last_visit = lastVisit;
+          }
+          if (!existing.name && name) existing.name = name;
+        }
+      }
+
+      return Array.from(byEmail.values()).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+    },
+    retry: 1,
+    meta: {
+      onError: (err: unknown) => {
+        const message =
+          err instanceof Error ? err.message : "Failed to load customers";
+        toast.error(message);
+      },
     },
   });
 
@@ -51,23 +110,16 @@ export default function CustomersPage() {
     const search = searchTerm.toLowerCase();
     return (
       customer.name.toLowerCase().includes(search) ||
-      customer.email.toLowerCase().includes(search) ||
-      customer.phone.toLowerCase().includes(search) ||
-      customer.nic.toLowerCase().includes(search)
+      customer.email.toLowerCase().includes(search)
     );
   });
 
   // Stats
   const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(
-    (c) => c.status === "active"
-  ).length;
-  const totalRevenue = customers.reduce(
-    (sum, c) => sum + c.total_spent,
-    0
-  );
-  const avgSpent =
-    totalCustomers > 0 ? Math.round(totalRevenue / totalCustomers) : 0;
+  const totalBookings = customers.reduce((sum, c) => sum + c.total_bookings, 0);
+  const pendingCount = customers.reduce((sum, c) => sum + (c.statuses["Pending"] ?? 0), 0);
+  const confirmedCount = customers.reduce((sum, c) => sum + (c.statuses["Confirmed"] ?? 0), 0);
+  const cancelledCount = customers.reduce((sum, c) => sum + (c.statuses["Cancelled"] ?? 0), 0);
 
   return (
     <div className="space-y-5">
@@ -119,25 +171,25 @@ export default function CustomersPage() {
             icon: "👥",
           },
           {
-            label: "Active",
-            value: activeCustomers,
+            label: "Total Bookings",
+            value: totalBookings,
             color: "bg-emerald-50",
             text: "text-emerald-700",
+            icon: "📦",
+          },
+          {
+            label: "Confirmed",
+            value: confirmedCount,
+            color: "bg-violet-50",
+            text: "text-violet-700",
             icon: "✅",
           },
           {
-            label: "Total Revenue",
-            value: `LKR ${totalRevenue.toLocaleString()}`,
-            color: "bg-violet-50",
-            text: "text-violet-700",
-            icon: "💰",
-          },
-          {
-            label: "Avg. Spent",
-            value: `LKR ${avgSpent.toLocaleString()}`,
+            label: "Pending / Cancelled",
+            value: `${pendingCount} / ${cancelledCount}`,
             color: "bg-amber-50",
             text: "text-amber-700",
-            icon: "📊",
+            icon: "⏳",
           },
         ].map((stat) => (
           <div
@@ -164,28 +216,19 @@ export default function CustomersPage() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  ID
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Name
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Contact
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  NIC
+                  Email
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Total Bookings
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Total Spent
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Last Visit
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
-                  Status
+                  Booking Status
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">
                   Actions
@@ -198,7 +241,7 @@ export default function CustomersPage() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={6}
                     className="px-4 py-8 text-center text-slate-500"
                   >
                     Loading customers...
@@ -207,7 +250,7 @@ export default function CustomersPage() {
               ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={6}
                     className="px-4 py-8 text-center text-slate-500"
                   >
                     {searchTerm
@@ -218,14 +261,9 @@ export default function CustomersPage() {
               ) : (
                 filteredCustomers.map((customer) => (
                   <tr
-                    key={customer.id}
+                    key={customer.key}
                     className="hover:bg-slate-50 transition-colors"
                   >
-                    {/* ID */}
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      #{customer.id}
-                    </td>
-
                     {/* Name */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -238,16 +276,8 @@ export default function CustomersPage() {
                       </div>
                     </td>
 
-                    {/* Contact */}
-                    <td className="px-4 py-3 text-slate-600">
-                      <div>{customer.phone}</div>
-                      <div className="text-slate-500">{customer.email}</div>
-                    </td>
-
-                    {/* NIC */}
-                    <td className="px-4 py-3 text-slate-700">
-                      {customer.nic}
-                    </td>
+                    {/* Email */}
+                    <td className="px-4 py-3 text-slate-600">{customer.email}</td>
 
                     {/* Total Bookings */}
                     <td className="px-4 py-3">
@@ -256,28 +286,23 @@ export default function CustomersPage() {
                       </span>
                     </td>
 
-                    {/* Total Spent */}
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      LKR {customer.total_spent.toLocaleString()}
-                    </td>
-
                     {/* Last Visit */}
                     <td className="px-4 py-3 text-slate-700">
-                      {customer.last_visit
-                        ? new Date(customer.last_visit).toLocaleDateString()
-                        : "N/A"}
+                      {customer.last_visit ?? "N/A"}
                     </td>
 
-                    {/* Status */}
+                    {/* Status summary */}
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          customer.status === "active"
+                          (customer.statuses["Confirmed"] ?? 0) > 0
                             ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-100 text-slate-700"
+                            : "bg-amber-100 text-amber-700"
                         }`}
                       >
-                        {customer.status}
+                        {`Confirmed ${customer.statuses["Confirmed"] ?? 0} · Pending ${
+                          customer.statuses["Pending"] ?? 0
+                        } · Cancelled ${customer.statuses["Cancelled"] ?? 0}`}
                       </span>
                     </td>
 
@@ -326,7 +351,7 @@ export default function CustomersPage() {
                   {selectedCustomer.name}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Customer #{selectedCustomer.id}
+                  {selectedCustomer.email}
                 </p>
               </div>
             </div>
@@ -335,28 +360,17 @@ export default function CustomersPage() {
             <div className="space-y-3 bg-slate-50 rounded-xl p-4">
               {[
                 { label: "Email", value: selectedCustomer.email },
-                { label: "Phone", value: selectedCustomer.phone },
-                { label: "NIC", value: selectedCustomer.nic },
-                { label: "Address", value: selectedCustomer.address },
                 {
                   label: "Total Bookings",
                   value: selectedCustomer.total_bookings.toString(),
                 },
                 {
-                  label: "Total Spent",
-                  value: `LKR ${selectedCustomer.total_spent.toLocaleString()}`,
-                },
-                {
                   label: "Last Visit",
-                  value: selectedCustomer.last_visit
-                    ? new Date(selectedCustomer.last_visit).toLocaleDateString()
-                    : "N/A",
+                  value: selectedCustomer.last_visit ?? "N/A",
                 },
                 {
                   label: "Member Since",
-                  value: new Date(
-                    selectedCustomer.created_at
-                  ).toLocaleDateString(),
+                  value: selectedCustomer.registration_date ?? "N/A",
                 },
               ].map((detail) => (
                 <div
