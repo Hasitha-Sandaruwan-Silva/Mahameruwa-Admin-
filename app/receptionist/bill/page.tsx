@@ -1,49 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../../utils/api";
 import toast from "react-hot-toast";
-
-// ==================== TYPES ====================
-
-interface BillItem {
-  description: string;
-  quantity: number;
-  unit_price: number;
-  total: number;
-}
-
-interface Bill {
-  id: number;
-  booking_id: number;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  room_number: string;
-  room_type: string;
-  check_in: string;
-  check_out: string;
-  nights: number;
-  room_charges: number;
-  additional_charges: BillItem[];
-  subtotal: number;
-  tax: number;
-  total: number;
-  payment_status: "pending" | "partial" | "paid";
-  generated_at: string;
-}
-
-interface Booking {
-  id: number;
-  customer_name: string;
-  room_number: string;
-  room_type: string;
-  check_in: string;
-  check_out: string;
-  total_price: number;
-  status: string;
-}
+import type { Reservation, Room } from "../../../utils/types";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -53,46 +14,60 @@ interface ApiResponse<T> {
 // ==================== MAIN COMPONENT ====================
 
 export default function BillPage() {
-  const [selectedBookingId, setSelectedBookingId] = useState<string>("");
-  const [generatedBill, setGeneratedBill] = useState<Bill | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Fetch bookings for dropdown
-  const { data: bookings = [] } = useQuery({
-    queryKey: ["billable-bookings"],
+  const { data: reservations = [] } = useQuery({
+    queryKey: ["reservations"],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Booking[]>>(
-        "/api/staff/bookings/?billable=true"
+      const res = await apiClient.get<ApiResponse<Reservation[]>>(
+        "/api/staff/reservations/",
       );
-      return res.data.data;
+      return res.data.data ?? [];
     },
   });
 
-  // Generate bill mutation
-  const generateBillMutation = useMutation({
-    mutationFn: async (bookingId: string) => {
-      const res = await apiClient.post<ApiResponse<Bill>>(
-        `/api/staff/bookings/${bookingId}/generate-bill/`
-      );
-      return res.data.data;
-    },
-    onSuccess: (data) => {
-      setGeneratedBill(data);
-      toast.success("Bill generated successfully!");
-    },
-    onError: () => {
-      toast.error("Failed to generate bill");
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: async () => {
+      const res = await apiClient.get<ApiResponse<Room[]>>("/api/staff/rooms/");
+      return res.data.data ?? [];
     },
   });
 
-  // Handle generate bill
-  const handleGenerateBill = () => {
-    if (!selectedBookingId) {
-      toast.error("Please select a booking");
-      return;
+  const roomById = useMemo(() => {
+    const map = new Map<number, Room>();
+    rooms.forEach((r) => map.set(r.id, r));
+    return map;
+  }, [rooms]);
+
+  const selected = useMemo(() => {
+    const id = Number(selectedReservationId);
+    if (!Number.isFinite(id)) return null;
+    return reservations.find((r) => r.id === id) ?? null;
+  }, [reservations, selectedReservationId]);
+
+  const selectedRoom = selected ? roomById.get(selected.room) ?? null : null;
+
+  const bill = useMemo(() => {
+    if (!selected || !selectedRoom) return null;
+    const start = new Date(selected.check_in);
+    const end = new Date(selected.check_out);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return null;
     }
-    generateBillMutation.mutate(selectedBookingId);
-  };
+    const nights = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    const pricePerNight = Number(selectedRoom.price);
+    const total = nights * pricePerNight;
+    return {
+      nights,
+      pricePerNight,
+      total,
+    };
+  }, [selected, selectedRoom]);
 
   // Handle print
   const handlePrint = () => {
@@ -147,44 +122,46 @@ export default function BillPage() {
       {/* ========== GENERATE BILL FORM ========== */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">
-          Generate Bill
+          Generate Bill (Reservation)
         </h2>
 
         <div className="flex gap-3">
-          {/* Booking Selector */}
+          {/* Reservation Selector */}
           <select
-            value={selectedBookingId}
-            onChange={(e) => setSelectedBookingId(e.target.value)}
+            value={selectedReservationId}
+            onChange={(e) => setSelectedReservationId(e.target.value)}
             className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-blue-500"
           >
-            <option value="">Select a booking...</option>
-            {bookings.map((booking) => (
-              <option key={booking.id} value={booking.id}>
-                #{booking.id} — {booking.customer_name} — Room{" "}
-                {booking.room_number} —{" "}
-                {new Date(booking.check_in).toLocaleDateString()} to{" "}
-                {new Date(booking.check_out).toLocaleDateString()}
+            <option value="">Select a reservation...</option>
+            {reservations.map((r) => (
+              <option key={r.id} value={r.id}>
+                #{r.id} — {r.customer_name} — {r.check_in} to {r.check_out}
               </option>
             ))}
           </select>
-
-          {/* Generate Button */}
           <button
-            onClick={handleGenerateBill}
-            disabled={
-              !selectedBookingId || generateBillMutation.isPending
-            }
+            type="button"
+            onClick={() => {
+              if (!selectedReservationId) {
+                toast.error("Please select a reservation");
+                return;
+              }
+              if (!bill) {
+                toast.error("Unable to generate bill for this reservation");
+                return;
+              }
+              toast.success("Bill ready");
+            }}
+            disabled={!selectedReservationId}
             className="px-6 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {generateBillMutation.isPending
-              ? "Generating..."
-              : "Generate Bill"}
+            Generate Bill
           </button>
         </div>
       </div>
 
       {/* ========== GENERATED BILL ========== */}
-      {generatedBill && (
+      {selected && selectedRoom && bill && (
         <>
           {/* Action Buttons */}
           <div className="flex gap-2 justify-end">
@@ -221,15 +198,13 @@ export default function BillPage() {
                 <div>
                   <p className="text-xs text-slate-500">Bill No</p>
                   <p className="text-sm font-bold text-slate-900">
-                    #{generatedBill.id}
+                    RES-{selected.id}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-500">Date</p>
                   <p className="text-sm font-medium text-slate-900">
-                    {new Date(
-                      generatedBill.generated_at
-                    ).toLocaleDateString()}
+                    {new Date().toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -240,9 +215,9 @@ export default function BillPage() {
                   Customer Details
                 </p>
                 {[
-                  { label: "Name", value: generatedBill.customer_name },
-                  { label: "Email", value: generatedBill.customer_email },
-                  { label: "Phone", value: generatedBill.customer_phone },
+                  { label: "Name", value: selected.customer_name },
+                  { label: "Email", value: selected.email },
+                  { label: "Phone", value: selected.phone },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -266,23 +241,19 @@ export default function BillPage() {
                 {[
                   {
                     label: "Room",
-                    value: `${generatedBill.room_number} (${generatedBill.room_type})`,
+                    value: `${selectedRoom.name} (${selectedRoom.category})`,
                   },
                   {
                     label: "Check-in",
-                    value: new Date(
-                      generatedBill.check_in
-                    ).toLocaleDateString(),
+                    value: selected.check_in,
                   },
                   {
                     label: "Check-out",
-                    value: new Date(
-                      generatedBill.check_out
-                    ).toLocaleDateString(),
+                    value: selected.check_out,
                   },
                   {
                     label: "Nights",
-                    value: generatedBill.nights.toString(),
+                    value: String(bill.nights),
                   },
                 ].map((item) => (
                   <div
@@ -325,46 +296,18 @@ export default function BillPage() {
                     {/* Room Charges */}
                     <tr className="border-b border-slate-100">
                       <td className="py-2 text-slate-700">
-                        Room Charges ({generatedBill.room_type})
+                        Room Charges ({selectedRoom.category})
                       </td>
                       <td className="py-2 text-center text-slate-700">
-                        {generatedBill.nights} nights
+                        {bill.nights} nights
                       </td>
                       <td className="py-2 text-right text-slate-700">
-                        LKR{" "}
-                        {(
-                          generatedBill.room_charges /
-                          generatedBill.nights
-                        ).toLocaleString()}
+                        LKR {bill.pricePerNight.toLocaleString()}
                       </td>
                       <td className="py-2 text-right font-medium text-slate-900">
-                        LKR{" "}
-                        {generatedBill.room_charges.toLocaleString()}
+                        LKR {bill.total.toLocaleString()}
                       </td>
                     </tr>
-
-                    {/* Additional Charges */}
-                    {generatedBill.additional_charges.map(
-                      (charge, idx) => (
-                        <tr
-                          key={idx}
-                          className="border-b border-slate-100"
-                        >
-                          <td className="py-2 text-slate-700">
-                            {charge.description}
-                          </td>
-                          <td className="py-2 text-center text-slate-700">
-                            {charge.quantity}
-                          </td>
-                          <td className="py-2 text-right text-slate-700">
-                            LKR {charge.unit_price.toLocaleString()}
-                          </td>
-                          <td className="py-2 text-right font-medium text-slate-900">
-                            LKR {charge.total.toLocaleString()}
-                          </td>
-                        </tr>
-                      )
-                    )}
                   </tbody>
                 </table>
               </div>
@@ -374,13 +317,13 @@ export default function BillPage() {
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Subtotal</span>
                   <span className="font-medium text-slate-900">
-                    LKR {generatedBill.subtotal.toLocaleString()}
+                    LKR {bill.total.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Tax (10%)</span>
+                  <span className="text-slate-500">Tax</span>
                   <span className="font-medium text-slate-900">
-                    LKR {generatedBill.tax.toLocaleString()}
+                    LKR 0
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-200">
@@ -388,27 +331,9 @@ export default function BillPage() {
                     Grand Total
                   </span>
                   <span className="grand-total text-xl font-bold text-blue-700">
-                    LKR {generatedBill.total.toLocaleString()}
+                    LKR {bill.total.toLocaleString()}
                   </span>
                 </div>
-              </div>
-
-              {/* Payment Status */}
-              <div className="mt-4 flex items-center justify-between bg-slate-50 rounded-xl p-3">
-                <span className="text-xs text-slate-500">
-                  Payment Status
-                </span>
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                    generatedBill.payment_status === "paid"
-                      ? "bg-green-100 text-green-700"
-                      : generatedBill.payment_status === "partial"
-                      ? "bg-orange-100 text-orange-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
-                >
-                  {generatedBill.payment_status.toUpperCase()}
-                </span>
               </div>
 
               {/* Footer */}
@@ -426,14 +351,14 @@ export default function BillPage() {
       )}
 
       {/* ========== NO BILL STATE ========== */}
-      {!generatedBill && (
+      {!selectedReservationId && (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <div className="text-5xl mb-4">🧾</div>
           <p className="text-sm font-medium text-slate-900">
             No bill generated yet
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            Select a booking above and click &quot;Generate Bill&quot;
+            Select a reservation above and click &quot;Generate Bill&quot;
           </p>
         </div>
       )}

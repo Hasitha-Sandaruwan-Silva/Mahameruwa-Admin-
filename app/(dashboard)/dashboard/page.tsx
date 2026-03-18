@@ -4,6 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../../utils/api";
 import { QUERY_KEYS } from "../../../utils/constants";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion"; 
+import { 
+  BedDouble, 
+  CalendarCheck, 
+  Clock, 
+  CheckCircle2, 
+  XCircle, 
+  TrendingUp,
+  ChevronRight,
+  LayoutDashboard,
+  Wallet,
+  ArrowUpRight,
+  Zap,
+  Activity
+} from "lucide-react"; 
 
 interface DashboardStats {
   total_rooms: number;
@@ -33,10 +48,10 @@ interface ApiResponse {
   data: DashboardStats;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Pending:   "bg-amber-50 text-amber-700 border-amber-200",
-  Confirmed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Cancelled: "bg-red-50 text-red-600 border-red-200",
+const STATUS_THEMES: Record<string, string> = {
+  Pending:   "bg-amber-50 text-amber-600 ring-1 ring-amber-200",
+  Confirmed: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200",
+  Cancelled: "bg-rose-50 text-rose-600 ring-1 ring-rose-200",
 };
 
 export default function DashboardPage() {
@@ -50,130 +65,197 @@ export default function DashboardPage() {
   });
 
   const statCards = [
-    { label: "Total Rooms",      value: data?.total_rooms ?? 0,        accent: "bg-emerald-500", light: "bg-emerald-50", text: "text-emerald-700", href: "/rooms" },
-    { label: "Total Bookings",   value: data?.total_bookings ?? 0,     accent: "bg-sky-500",     light: "bg-sky-50",     text: "text-sky-700",     href: "/reservations" },
-    { label: "Pending",          value: data?.pending_bookings ?? 0,   accent: "bg-amber-500",   light: "bg-amber-50",   text: "text-amber-700",   href: "/reservations" },
-    { label: "Confirmed",        value: data?.confirmed_bookings ?? 0, accent: "bg-teal-500",    light: "bg-teal-50",    text: "text-teal-700",    href: "/reservations" },
-    { label: "Cancelled",        value: data?.cancelled_bookings ?? 0, accent: "bg-red-400",     light: "bg-red-50",     text: "text-red-600",     href: "/reservations" },
-    { label: "Occupancy Rate",   value: `${data?.occupancy_rate ?? 0}%`, accent: "bg-violet-500", light: "bg-violet-50", text: "text-violet-700",  href: "/rooms" },
+    { label: "Rooms",        value: data?.total_rooms ?? 0,          icon: BedDouble,     color: "bg-slate-50 text-slate-600", border: "border-slate-100", href: "/rooms" },
+    { label: "Bookings",     value: data?.total_bookings ?? 0,       icon: CalendarCheck, color: "bg-indigo-50 text-indigo-600", border: "border-indigo-100",  href: "/reservations" },
+    { label: "Pending",      value: data?.pending_bookings ?? 0,     icon: Clock,         color: "bg-amber-50 text-amber-600", border: "border-amber-100", href: "/reservations" },
+    { label: "Confirmed",    value: data?.confirmed_bookings ?? 0,   icon: CheckCircle2,  color: "bg-emerald-50 text-emerald-600", border: "border-emerald-100", href: "/reservations" },
+    { label: "Cancelled",    value: data?.cancelled_bookings ?? 0,   icon: XCircle,       color: "bg-rose-50 text-rose-600", border: "border-rose-100",  href: "/reservations" },
+    { label: "Occupancy",    value: `${data?.occupancy_rate ?? 0}%`, icon: TrendingUp,    color: "bg-violet-50 text-violet-600", border: "border-violet-100", href: "/rooms" },
   ];
 
   return (
-    <div className="space-y-6">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Welcome to Mahameruwa 🏨</h1>
-          <p className="mt-1 text-sm text-slate-500">Overview of rooms, bookings, orders, and reservations.</p>
+    <div className="max-w-[1600px] mx-auto p-4 md:p-6 space-y-6 bg-[#FBFCFE] min-h-screen">
+      
+      {/* --- Elegant Header --- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4">
+           <div className="h-12 w-12 bg-slate-950 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-slate-200">
+              <LayoutDashboard size={22} />
+           </div>
+           <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Executive Dashboard</h1>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em]">Mahameruwa Management Cloud</p>
+           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-slate-400">{new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+        <div className="flex items-center gap-2 bg-emerald-50/50 px-4 py-2 rounded-xl border border-emerald-100">
+            <Activity size={14} className="text-emerald-500" />
+            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Real-time monitoring active</span>
         </div>
       </div>
 
-      {/* Revenue Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 p-5 text-white shadow-sm">
-        <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Estimated Revenue</p>
-        <p className="text-3xl font-bold mt-1">
-          LKR {(data?.estimated_revenue ?? 0).toLocaleString()}
-        </p>
-        <p className="text-xs opacity-70 mt-1">From confirmed reservations</p>
-      </div>
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {isLoading ? (
-          [...Array(6)].map((_, i) => (
-            <div key={i} className="animate-pulse rounded-2xl border bg-white p-4 h-24" />
-          ))
-        ) : (
-          statCards.map(({ label, value, accent, light, text, href }) => (
-            <div
-              key={label}
-              onClick={() => router.push(href)}
-              className="rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-            >
-              <div className={`h-8 w-8 rounded-xl ${light} flex items-center justify-center mb-3`}>
-                <div className={`h-3 w-3 rounded-full ${accent}`} />
-              </div>
-              <p className={`text-xl font-bold text-slate-900`}>{value}</p>
-              <p className={`text-xs font-medium ${text} mt-0.5`}>{label}</p>
+      {/* --- Revenue & Occupancy --- */}
+      <div className="grid lg:grid-cols-12 gap-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="lg:col-span-8 relative overflow-hidden rounded-[32px] bg-slate-950 p-8 md:p-10 text-white shadow-2xl shadow-slate-300"
+        >
+            <div className="relative z-10 flex flex-col h-full justify-between gap-12">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-[10px] font-black uppercase tracking-widest text-emerald-400 border border-white/10 backdrop-blur-md">
+                       <Zap size={12} fill="currentColor" /> Revenue Stream
+                    </div>
+                </div>
+                <div>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-3">Estimated Net Revenue</p>
+                    <div className="flex items-baseline gap-3">
+                        <span className="text-slate-500 text-2xl font-bold">LKR</span>
+                        <h2 className="text-5xl md:text-7xl font-black tracking-tighter">
+                            {(data?.estimated_revenue ?? 0).toLocaleString()}
+                        </h2>
+                    </div>
+                </div>
+                <button 
+                    onClick={() => router.push('/reservations')}
+                    className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all w-fit group"
+                >
+                    View Analytics <ArrowUpRight size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
             </div>
+            {/* Design Elements */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] -mr-32 -mt-32" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -ml-20 -mb-20" />
+        </motion.div>
+        
+        <div className="lg:col-span-4 rounded-[32px] border border-white bg-white p-8 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div className="relative z-10">
+                <div className="flex items-center justify-between mb-8">
+                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest">Global Occupancy</p>
+                    <TrendingUp size={18} className="text-indigo-500" />
+                </div>
+                <span className="text-6xl font-black text-slate-900 tracking-tighter">{data?.occupancy_rate ?? 0}%</span>
+                <div className="w-full bg-slate-100 h-3 rounded-full mt-8 overflow-hidden">
+                    <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${data?.occupancy_rate ?? 0}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full shadow-[0_0_12px_rgba(79,70,229,0.3)]"
+                    />
+                </div>
+                <div className="grid grid-cols-2 mt-8 pt-8 border-t border-slate-50">
+                    <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Status</p>
+                        <p className="text-sm font-bold text-emerald-600">Optimal</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Growth</p>
+                        <p className="text-sm font-bold text-slate-900">+2.4%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* --- Stat Cards Grid --- */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {isLoading ? (
+          [...Array(6)].map((_, i) => <div key={i} className="h-24 rounded-[20px] bg-white animate-pulse border border-slate-100" />)
+        ) : (
+          statCards.map((card, idx) => (
+            <motion.div 
+              whileHover={{ y: -4 }}
+              key={idx}
+              onClick={() => router.push(card.href)}
+              className={`group p-5 rounded-[24px] border ${card.border} bg-white transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-slate-100`}
+            >
+              <div className={`h-8 w-8 ${card.color} rounded-lg flex items-center justify-center mb-3 transition-transform group-hover:scale-110`}>
+                 <card.icon size={16} strokeWidth={2.5} />
+              </div>
+              <p className="text-2xl font-black text-slate-900 tracking-tighter">{card.value}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mt-0.5">{card.label}</p>
+            </motion.div>
           ))
         )}
       </div>
 
-      {/* Recent Tables */}
+      {/* --- Activity Sections --- */}
       <div className="grid gap-6 lg:grid-cols-2">
-
-        {/* Recent Reservations */}
-        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-semibold text-slate-900">Recent Reservations</h2>
-            <button onClick={() => router.push("/reservations")} className="text-xs text-emerald-600 hover:underline">View all</button>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {isLoading ? (
-              [...Array(4)].map((_, i) => <RowSkeleton key={i} />)
-            ) : !data?.recent_reservations?.length ? (
-              <p className="px-4 py-6 text-xs text-slate-400 text-center">No reservations yet.</p>
-            ) : (
-              data.recent_reservations.map((r) => (
-                <div key={r.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{r.customer_name}</p>
-                    <p className="text-xs text-slate-400">{r.room_name} · Check-in {r.check_in}</p>
+        <ActivitySection title="Recent Reservations" onViewAll={() => router.push("/reservations")}>
+          {isLoading ? (
+            [...Array(4)].map((_, i) => <div key={i} className="h-16 bg-slate-50 animate-pulse rounded-2xl mb-3" />)
+          ) : !data?.recent_reservations?.length ? (
+            <EmptyState message="No reservations found" />
+          ) : (
+            <div className="space-y-1">
+              {data.recent_reservations.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border-b border-slate-50 last:border-0 group">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-slate-50 rounded-xl flex items-center justify-center text-[10px] font-black text-slate-400 uppercase group-hover:bg-white group-hover:shadow-sm transition-all">
+                        {r.customer_name[0]}
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-slate-900 tracking-tight">{r.customer_name}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{r.room_name} • {r.check_in}</p>
+                    </div>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[r.status] ?? "bg-slate-50 text-slate-600"}`}>
-                    {r.status}
-                  </span>
+                  <StatusBadge status={r.status} />
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </ActivitySection>
 
-        {/* Recent Orders */}
-        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-semibold text-slate-900">Recent Orders</h2>
-            <button onClick={() => router.push("/orders")} className="text-xs text-emerald-600 hover:underline">View all</button>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {isLoading ? (
-              [...Array(4)].map((_, i) => <RowSkeleton key={i} />)
-            ) : !data?.recent_orders?.length ? (
-              <p className="px-4 py-6 text-xs text-slate-400 text-center">No orders yet.</p>
-            ) : (
-              data.recent_orders.map((o) => (
-                <div key={o.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{o.customer_name}</p>
-                    <p className="text-xs text-slate-400">{o.room_name}</p>
+        <ActivitySection title="Active Service Orders" onViewAll={() => router.push("/orders")}>
+          {isLoading ? (
+            [...Array(4)].map((_, i) => <div key={i} className="h-16 bg-slate-50 animate-pulse rounded-2xl mb-3" />)
+          ) : !data?.recent_orders?.length ? (
+            <EmptyState message="No active orders" />
+          ) : (
+            <div className="space-y-1">
+              {data.recent_orders.map((o) => (
+                <div key={o.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border-b border-slate-50 last:border-0 group">
+                   <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <Wallet size={16} />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-slate-900 tracking-tight">{o.customer_name}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{o.room_name}</p>
+                    </div>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[o.status] ?? "bg-slate-50 text-slate-600"}`}>
-                    {o.status}
-                  </span>
+                  <StatusBadge status={o.status} />
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
+              ))}
+            </div>
+          )}
+        </ActivitySection>
       </div>
     </div>
   );
 }
 
-function RowSkeleton() {
+function ActivitySection({ title, children, onViewAll }: { title: string, children: React.ReactNode, onViewAll: () => void }) {
   return (
-    <div className="flex animate-pulse items-center justify-between px-4 py-3">
-      <div className="space-y-1.5">
-        <div className="h-3 w-28 rounded bg-slate-100" />
-        <div className="h-2.5 w-36 rounded bg-slate-100" />
+    <div className="bg-white rounded-[28px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between px-7 py-6 border-b border-slate-50">
+        <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">{title}</h2>
+        <button onClick={onViewAll} className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-lg">
+          Records <ChevronRight size={14} />
+        </button>
       </div>
-      <div className="h-5 w-16 rounded-full bg-slate-100" />
+      <div className="p-3 flex-1">{children}</div>
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm ${STATUS_THEMES[status] ?? "bg-slate-100 text-slate-600"}`}>
+      {status}
+    </span>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return <div className="py-12 text-center text-slate-400 text-[11px] font-bold uppercase tracking-widest italic">{message}</div>;
 }
