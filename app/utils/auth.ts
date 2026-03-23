@@ -10,6 +10,7 @@ export interface StaffUser {
   email: string;
   username: string;
   role: StaffRole | string;
+   phone?: string;
 }
 
 export interface AuthResponse {

@@ -6,6 +6,7 @@ import { Sidebar } from "../components/layout/Sidebar";
 import { Navbar } from "../components/layout/Navbar";
 import { Footer } from "../components/layout/Footer";
 
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
