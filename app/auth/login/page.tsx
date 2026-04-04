@@ -11,6 +11,7 @@ interface LoginApiResponse {
   message?: string;
   access?: string;
   user?: AuthResponse["user"];
+  setup_required?: boolean;
   data?: {
     setup_required?: boolean;
     access?: string;
@@ -49,14 +50,12 @@ export default function LoginPage() {
   toast.success("Welcome back");
   
   
-  const role = payload.user.role;
-  if (role === "Waiter") {
-    router.push("/waiter");
-  } else if (role === "Receptionist") {
-    router.push("/receptionist");
-  } else {
-    router.push("/dashboard"); // Manager, Accountant
-  }
+  const role: string = payload.user.role;
+if (role === "Waiter") router.push("/waiter");
+else if (role === "Receptionist") router.push("/receptionist");
+else if (role === "Accountant") router.push("/accountant");
+else if (role === "Barman") router.push("/barman");
+else router.push("/dashboard");
   return;
 }
       toast.error("Invalid response from server");

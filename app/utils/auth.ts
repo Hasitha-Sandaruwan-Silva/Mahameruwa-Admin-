@@ -2,7 +2,7 @@
 
 import { STORAGE_KEYS } from "./constants";
 
-export type StaffRole = "Manager" | "Receptionist" | "Waiter" | "Accountant";
+export type StaffRole = "Manager" | "Receptionist" | "Waiter" | "Accountant" | "Barman";
 
 export interface StaffUser {
   id: number;

@@ -9,31 +9,70 @@ import toast from "react-hot-toast";
 import type { StaffRole } from "../../utils/auth";
 
 const allNavItems = [
-  // ═══ Manager / Receptionist / Accountant ═══
-  { href: "/dashboard", label: "Overview", icon: "📊", roles: ["Manager", "Receptionist", "Accountant"] as StaffRole[] },
-  { href: "/rooms", label: "Rooms", icon: "🛏️", roles: ["Manager", "Receptionist"] as StaffRole[] },
-  { href: "/reservations", label: "Reservations", icon: "📅", roles: ["Manager", "Receptionist"] as StaffRole[] },
-  { href: "/orders", label: "Orders", icon: "🍽️", roles: ["Manager"] as StaffRole[] },
-  { href: "/menu", label: "Menu", icon: "📋", roles: ["Manager"] as StaffRole[] },
+
+  // ═══════════════════════════════════════════
+  // Manager Only (Full Access)
+  // ═══════════════════════════════════════════
+  { href: "/dashboard", label: "Overview", icon: "📊", roles: ["Manager"] as StaffRole[] },
+  { href: "/rooms", label: "Rooms", icon: "🛏️", roles: ["Manager"] as StaffRole[] },
+  { href: "/reservations", label: "Reservations", icon: "📅", roles: ["Manager"] as StaffRole[] },
+  { href: "/orders", label: "All Orders", icon: "🍽️", roles: ["Manager"] as StaffRole[] },
+  { href: "/menu", label: "Full Menu", icon: "📋", roles: ["Manager"] as StaffRole[] },
   { href: "/dashboard/inventory", label: "Inventory", icon: "📦", roles: ["Manager"] as StaffRole[] },
   { href: "/dashboard/staff", label: "Staff Management", icon: "👥", roles: ["Manager"] as StaffRole[] },
-  { href: "/dashboard/finance", label: "Reports & Finance", icon: "💰", roles: ["Manager", "Accountant"] as StaffRole[] },
-  { href: "/guests", label: "Guest History", icon: "👤", roles: ["Manager", "Receptionist"] as StaffRole[] },
+  { href: "/dashboard/finance", label: "Reports & Finance", icon: "💰", roles: ["Manager"] as StaffRole[] },
+  { href: "/guests", label: "Guest History", icon: "👤", roles: ["Manager"] as StaffRole[] },
+  { href: "/settings", label: "Settings", icon: "⚙️", roles: ["Manager"] as StaffRole[] },
 
-  // ═══ Waiter Only ═══
+  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // Receptionist Only
+  // ═══════════════════════════════════════════
+  { href: "/receptionist", label: "Dashboard", icon: "🏠", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/bookings", label: "Bookings", icon: "📅", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/checkin", label: "Check-In", icon: "✅", roles: ["Receptionist"] as StaffRole[] },      // ← 🆕
+  { href: "/receptionist/checkout", label: "Check-Out", icon: "🔓", roles: ["Receptionist"] as StaffRole[] },    // ← 🆕
+  { href: "/receptionist/reservations", label: "Reservations", icon: "🗓️", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/rooms", label: "Rooms", icon: "🚪", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/customers", label: "Customers", icon: "👥", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/pos", label: "Point of Sale", icon: "🛒", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/bill", label: "Billing", icon: "🧾", roles: ["Receptionist"] as StaffRole[] },
+  { href: "/receptionist/settings", label: "Settings", icon: "⚙️", roles: ["Receptionist"] as StaffRole[] },
+  // ═══════════════════════════════════════════
+  // Accountant Only
+  // ═══════════════════════════════════════════
+  { href: "/accountant", label: "Dashboard", icon: "📊", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/revenue", label: "Revenue", icon: "💰", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/expenses", label: "Expenses", icon: "📉", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/invoices", label: "Invoices", icon: "🧾", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/payroll", label: "Payroll", icon: "👥", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/reports", label: "Reports", icon: "📈", roles: ["Accountant"] as StaffRole[] },
+  { href: "/accountant/settings", label: "Settings", icon: "⚙️", roles: ["Accountant"] as StaffRole[] },
+
+  // ═══════════════════════════════════════════
+  // Waiter Only
+  // ═══════════════════════════════════════════
   { href: "/waiter", label: "My Orders", icon: "🍽️", roles: ["Waiter"] as StaffRole[] },
   { href: "/waiter/new-order", label: "New Order", icon: "➕", roles: ["Waiter"] as StaffRole[] },
   { href: "/waiter/kitchen", label: "Kitchen Orders", icon: "👨‍🍳", roles: ["Waiter"] as StaffRole[] },
   { href: "/waiter/tables", label: "Tables", icon: "🚪", roles: ["Waiter"] as StaffRole[] },
   { href: "/waiter/menu", label: "Menu", icon: "📋", roles: ["Waiter"] as StaffRole[] },
-
-  // ═══ Settings ═══
-  { href: "/settings", label: "Settings", icon: "⚙️", roles: ["Manager", "Receptionist", "Accountant"] as StaffRole[] },
   { href: "/waiter/settings", label: "Settings", icon: "⚙️", roles: ["Waiter"] as StaffRole[] },
+
+  // ═══════════════════════════════════════════
+  // Barman Only
+  // ═══════════════════════════════════════════
+  { href: "/barman", label: "Bar Overview", icon: "🍸", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/orders", label: "Bar Orders", icon: "🧾", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/menu", label: "Drink Menu", icon: "🍹", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/barcode", label: "Barcode Generator", icon: "🏷️", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/stock", label: "Stock", icon: "📦", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/sales", label: "Sales", icon: "📊", roles: ["Barman"] as StaffRole[] },
+  { href: "/barman/settings", label: "Settings", icon: "⚙️", roles: ["Barman"] as StaffRole[] },
 ];
 
 function getNavItemsForRole(role: StaffRole | string | null) {
-  if (!role) return allNavItems;
+  if (!role) return [];
   return allNavItems.filter((item) =>
     item.roles.some((r) => r.toLowerCase() === role.toLowerCase())
   );
@@ -64,55 +103,49 @@ export function Sidebar() {
         collapsed ? "w-20" : "w-64"
       }`}
     >
-      {/* ⭐ FIXED Header with Logo */}
-      <div className="px-3 py-4 border-b border-slate-100">
-        {/* Top Row: Logo + Toggle */}
-        <div className="flex items-center justify-between mb-2">
+      <div className="border-b border-slate-100 px-3 py-4">
+        <div className="mb-2 flex items-center justify-between">
           <Link href="/dashboard" className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-xl overflow-hidden bg-white shadow-md border border-slate-100">
+            <div className="h-10 w-10 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
               <Image
                 src="/logo.png"
                 alt="Mahameruwa Logo"
                 width={40}
                 height={40}
-                className="object-contain w-full h-full"
+                className="h-full w-full object-contain"
               />
             </div>
           </Link>
-          
-          {/* Toggle Button */}
+
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label="Toggle sidebar"
           >
             {collapsed ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
             )}
           </button>
         </div>
 
-        {/* Bottom Row: Hotel Name (only when expanded) */}
         {!collapsed && (
           <div className="pl-1">
-            <h1 className="text-sm font-bold text-slate-800 tracking-wide">MAHAMERUWA</h1>
+            <h1 className="text-sm font-bold tracking-wide text-slate-800">MAHAMERUWA</h1>
             <p className="text-xs text-slate-500">{portalName}</p>
           </div>
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="mt-2 flex-1 space-y-1 px-2 overflow-y-auto custom-scrollbar">
+      <nav className="custom-scrollbar mt-2 flex-1 space-y-1 overflow-y-auto px-2">
         {navItems.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.href}
@@ -124,17 +157,16 @@ export function Sidebar() {
               }`}
               title={collapsed ? item.label : undefined}
             >
-              <span className="text-lg flex-shrink-0">{item.icon}</span>
+              <span className="flex-shrink-0 text-lg">{item.icon}</span>
               {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* User Info + Logout */}
       {!collapsed && user && (
-        <div className="p-3 border-t border-slate-200">
-          <div className="mb-2 px-3 py-2 bg-slate-50 rounded-lg">
+        <div className="border-t border-slate-200 p-3">
+          <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2">
             <p className="text-xs font-medium text-slate-900">
               {user.name || user.username}
             </p>
@@ -142,7 +174,7 @@ export function Sidebar() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-500 hover:bg-red-50 transition-colors"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-red-500 transition-colors hover:bg-red-50"
           >
             <span>🚪</span>
             <span>Sign out</span>
@@ -150,23 +182,20 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Collapsed — User Avatar + Logout */}
       {collapsed && (
-        <div className="p-2 border-t border-slate-200 space-y-2">
-          {/* User Avatar */}
+        <div className="space-y-2 border-t border-slate-200 p-2">
           {user && (
-            <div 
-              className="h-10 w-10 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-sm"
+            <div
+              className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700"
               title={user.name || user.username}
             >
               {(user.name || user.username || "U").charAt(0).toUpperCase()}
             </div>
           )}
-          
-          {/* Logout */}
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+            className="flex w-full items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50"
             title="Sign out"
           >
             🚪
@@ -174,5 +203,16 @@ export function Sidebar() {
         </div>
       )}
     </aside>
+  );
+}
+
+export function Footer() {
+  return (
+    <footer className="border-t bg-white/70 px-6 py-3 text-xs text-slate-500 backdrop-blur-sm">
+      <div className="flex items-center justify-between">
+        <span>© {new Date().getFullYear()} Mahameruwa Hospitality System</span>
+        <span className="hidden sm:inline">Staff Admin Dashboard</span>
+      </div>
+    </footer>
   );
 }
