@@ -14,11 +14,19 @@ interface Table {
   location: string;
 }
 
+interface SubCategory {
+  id: string;
+  name: string;
+  icon: string;
+}
+
 interface Category {
   id: string;
   name: string;
   icon: string;
   items_count: number;
+  has_subcategories: boolean;
+  subcategories: SubCategory[];
 }
 
 interface MenuItem {
@@ -42,7 +50,7 @@ interface CheckedInGuest {
   status: string;
 }
 
-type Step = "table" | "category" | "items";
+type Step = "table" | "category" | "subcategory" | "items";
 
 // ==================== Main Component ====================
 export default function POSPage() {
@@ -54,7 +62,8 @@ export default function POSPage() {
   const [step, setStep] = useState<Step>("table");
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<SubCategory | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [showGuestModal, setShowGuestModal] = useState(false);
@@ -79,16 +88,19 @@ export default function POSPage() {
     },
   });
 
+  // Get menu items based on selected category/subcategory
+  const menuCategoryId = selectedSubCategory?.id || selectedCategory?.id || "";
+  
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
-    queryKey: ["pos-menu", selectedCategory],
+    queryKey: ["pos-menu", menuCategoryId],
     queryFn: async () => {
-      if (!selectedCategory) return [];
+      if (!menuCategoryId) return [];
       const res = await apiClient.get(
-        `/api/staff/pos/menu/${encodeURIComponent(selectedCategory)}/`
+        `/api/staff/pos/menu/${encodeURIComponent(menuCategoryId)}/`
       );
       return res.data.data || [];
     },
-    enabled: !!selectedCategory && step === "items",
+    enabled: !!menuCategoryId && step === "items",
   });
 
   const { data: checkedInGuests = [] } = useQuery<CheckedInGuest[]>({
@@ -135,15 +147,34 @@ export default function POSPage() {
     setStep("category");
   };
 
-  const selectCategory = (categoryName: string) => {
-    setSelectedCategory(categoryName);
+  const selectCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setSelectedSubCategory(null);
+    
+    if (category.has_subcategories && category.subcategories.length > 0) {
+      setStep("subcategory");
+    } else {
+      setStep("items");
+    }
+  };
+
+  const selectSubCategory = (subcat: SubCategory) => {
+    setSelectedSubCategory(subcat);
     setStep("items");
   };
 
   const goBack = () => {
     if (step === "items") {
-      setStep("category");
+      if (selectedSubCategory) {
+        setSelectedSubCategory(null);
+        setStep("subcategory");
+      } else {
+        setSelectedCategory(null);
+        setStep("category");
+      }
+    } else if (step === "subcategory") {
       setSelectedCategory(null);
+      setStep("category");
     } else if (step === "category") {
       setStep("table");
       setSelectedTable(null);
@@ -212,6 +243,7 @@ export default function POSPage() {
     setSelectedTable(null);
     setSelectedGuest(null);
     setSelectedCategory(null);
+    setSelectedSubCategory(null);
     setCart([]);
     setCustomerName("");
   };
@@ -221,6 +253,16 @@ export default function POSPage() {
   // ══════════════════════════════════════════════
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Breadcrumb
+  const getBreadcrumb = () => {
+    const parts = [];
+    if (selectedTable) parts.push(`Table ${selectedTable.table_number}`);
+    if (selectedGuest) parts.push(`Room ${selectedGuest.room}`);
+    if (selectedCategory) parts.push(selectedCategory.name);
+    if (selectedSubCategory) parts.push(selectedSubCategory.name);
+    return parts;
+  };
 
   // ══════════════════════════════════════════════
   // RENDER
@@ -232,14 +274,15 @@ export default function POSPage() {
       ══════════════════════════════════════════════ */}
       <div className="flex w-[70%] flex-col border-r-2 border-gray-300 bg-white">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-white">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-white">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">🍽️ Restaurant POS</h1>
-              <p className="text-sm text-blue-100">
+              <p className="text-sm text-indigo-100">
                 {step === "table" && "Select a table or charge to room"}
                 {step === "category" && "Select a category"}
-                {step === "items" && `Category: ${selectedCategory}`}
+                {step === "subcategory" && `${selectedCategory?.name} - Select option`}
+                {step === "items" && "Select items to add"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -255,26 +298,25 @@ export default function POSPage() {
                 onClick={resetPOS}
                 className="rounded-lg bg-red-500 px-4 py-2 font-medium hover:bg-red-600"
               >
-                New Order
+                🔄 New Order
               </button>
             </div>
           </div>
         </div>
 
-        {/* Current Selection Info */}
-        {(selectedTable || selectedGuest) && (
-          <div className="border-b bg-green-50 px-6 py-2">
-            <div className="flex items-center gap-3">
-              {selectedTable && (
-                <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
-                  🪑 Table {selectedTable.table_number}
+        {/* Breadcrumb */}
+        {getBreadcrumb().length > 0 && (
+          <div className="border-b bg-gray-50 px-6 py-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-500">📍</span>
+              {getBreadcrumb().map((item, idx) => (
+                <span key={idx} className="flex items-center gap-2">
+                  <span className="font-semibold text-indigo-600">{item}</span>
+                  {idx < getBreadcrumb().length - 1 && (
+                    <span className="text-gray-400">→</span>
+                  )}
                 </span>
-              )}
-              {selectedGuest && (
-                <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-bold text-purple-700">
-                  🏨 Room {selectedGuest.room} - {selectedGuest.guest_name}
-                </span>
-              )}
+              ))}
             </div>
           </div>
         )}
@@ -293,7 +335,7 @@ export default function POSPage() {
                 </h2>
                 <button
                   onClick={() => setShowGuestModal(true)}
-                  className="w-full rounded-xl border-2 border-purple-200 bg-purple-50 p-4 text-left hover:border-purple-400 hover:shadow-lg"
+                  className="w-full rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50 p-4 text-left hover:border-purple-400 hover:shadow-lg transition"
                 >
                   <div className="flex items-center gap-4">
                     <span className="text-4xl">🏨</span>
@@ -323,7 +365,7 @@ export default function POSPage() {
                       disabled={table.status !== "Available"}
                       className={`flex flex-col items-center rounded-xl border-2 p-4 transition ${
                         table.status === "Available"
-                          ? "border-green-200 bg-white hover:border-green-400 hover:shadow-lg"
+                          ? "border-green-200 bg-white hover:border-green-400 hover:shadow-lg hover:-translate-y-1"
                           : "cursor-not-allowed border-gray-200 bg-gray-100 opacity-60"
                       }`}
                     >
@@ -356,16 +398,46 @@ export default function POSPage() {
               {categories.map((cat) => (
                 <button
                   key={cat.id}
-                  onClick={() => selectCategory(cat.name)}
-                  className="flex flex-col items-center rounded-xl border-2 border-gray-200 bg-white p-6 transition hover:border-blue-400 hover:shadow-lg"
+                  onClick={() => selectCategory(cat)}
+                  className="flex flex-col items-center rounded-xl border-2 border-gray-200 bg-white p-6 transition hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1"
                 >
                   <span className="text-5xl">{cat.icon}</span>
                   <p className="mt-2 text-lg font-bold text-gray-800">{cat.name}</p>
                   <span className="mt-1 text-sm text-gray-500">
                     {cat.items_count} items
                   </span>
+                  {cat.has_subcategories && (
+                    <span className="mt-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-600">
+                      {cat.subcategories.length} options →
+                    </span>
+                  )}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              STEP 2.5: SUB-CATEGORY SELECTION (Activity)
+          ══════════════════════════════════════════════ */}
+          {step === "subcategory" && selectedCategory && (
+            <div>
+              <h2 className="mb-4 text-xl font-bold text-gray-800">
+                {selectedCategory.icon} {selectedCategory.name} Options
+              </h2>
+              <div className="grid grid-cols-3 gap-4">
+                {selectedCategory.subcategories.map((subcat) => (
+                  <button
+                    key={subcat.id}
+                    onClick={() => selectSubCategory(subcat)}
+                    className="flex flex-col items-center rounded-xl border-2 border-gray-200 bg-white p-6 transition hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1"
+                  >
+                    <span className="text-5xl">{subcat.icon}</span>
+                    <p className="mt-2 text-lg font-bold text-gray-800">
+                      {subcat.name}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -388,20 +460,25 @@ export default function POSPage() {
                     <button
                       key={item.id}
                       onClick={() => setQuantityModal(item)}
-                      className={`relative flex flex-col rounded-xl border-2 bg-white p-4 text-left transition hover:shadow-lg ${
+                      className={`relative flex flex-col rounded-xl border-2 bg-white p-4 text-left transition hover:shadow-lg hover:-translate-y-1 ${
                         inCart
-                          ? "border-blue-400 ring-2 ring-blue-200"
-                          : "border-gray-200 hover:border-blue-300"
+                          ? "border-indigo-400 ring-2 ring-indigo-200"
+                          : "border-gray-200 hover:border-indigo-300"
                       }`}
                     >
                       {inCart && (
-                        <div className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+                        <div className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-sm font-bold text-white shadow">
                           {inCart.quantity}
                         </div>
                       )}
                       <span className="text-3xl">{item.icon}</span>
                       <p className="mt-2 font-bold text-gray-800">{item.name}</p>
-                      <p className="text-xl font-bold text-blue-600">
+                      {item.description && (
+                        <p className="mt-1 text-xs text-gray-500 line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+                      <p className="mt-2 text-xl font-bold text-indigo-600">
                         LKR {item.price.toLocaleString()}
                       </p>
                     </button>
@@ -424,7 +501,7 @@ export default function POSPage() {
               <span className="text-2xl">🛒</span>
               <span className="text-lg font-bold">Order</span>
               {cartCount > 0 && (
-                <span className="rounded-full bg-blue-500 px-2 py-0.5 text-sm font-bold text-white">
+                <span className="rounded-full bg-indigo-500 px-2 py-0.5 text-sm font-bold text-white">
                   {cartCount}
                 </span>
               )}
@@ -446,7 +523,7 @@ export default function POSPage() {
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             placeholder="Customer name (optional)"
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:border-blue-400"
+            className="w-full rounded-lg border px-3 py-2 outline-none focus:border-indigo-400"
           />
         </div>
 
@@ -456,6 +533,7 @@ export default function POSPage() {
             <div className="flex h-full flex-col items-center justify-center text-gray-400">
               <span className="text-5xl">🛒</span>
               <p className="mt-3 font-medium">Cart is empty</p>
+              <p className="text-sm">Select items to add</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -474,7 +552,7 @@ export default function POSPage() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => updateCartQuantity(item.id, -1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-500 shadow"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-500 shadow hover:bg-red-50"
                     >
                       −
                     </button>
@@ -483,7 +561,7 @@ export default function POSPage() {
                     </span>
                     <button
                       onClick={() => updateCartQuantity(item.id, 1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-green-500 shadow"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-green-500 shadow hover:bg-green-50"
                     >
                       +
                     </button>
@@ -507,7 +585,7 @@ export default function POSPage() {
         <div className="border-t bg-gray-50 px-4 py-3">
           <div className="flex items-center justify-between text-xl font-bold">
             <span>Total</span>
-            <span className="text-blue-600">LKR {cartTotal.toLocaleString()}</span>
+            <span className="text-indigo-600">LKR {cartTotal.toLocaleString()}</span>
           </div>
         </div>
 
@@ -516,9 +594,9 @@ export default function POSPage() {
           <button
             onClick={placeOrder}
             disabled={cart.length === 0 || createOrderMutation.isPending}
-            className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 py-4 text-lg font-bold text-white shadow-lg transition hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 py-4 text-lg font-bold text-white shadow-lg transition hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50"
           >
-            {createOrderMutation.isPending ? "Processing..." : "Place Order"}
+            {createOrderMutation.isPending ? "Processing..." : "✓ Place Order"}
           </button>
         </div>
       </div>
@@ -584,7 +662,7 @@ export default function POSPage() {
             <div className="text-center">
               <span className="text-5xl">{quantityModal.icon}</span>
               <h2 className="mt-2 text-xl font-bold">{quantityModal.name}</h2>
-              <p className="text-lg font-bold text-blue-600">
+              <p className="text-lg font-bold text-indigo-600">
                 LKR {quantityModal.price.toLocaleString()}
               </p>
             </div>
@@ -598,7 +676,7 @@ export default function POSPage() {
                 <button
                   key={qty}
                   onClick={() => addToCart(quantityModal, qty)}
-                  className="flex h-12 items-center justify-center rounded-lg bg-blue-50 text-lg font-bold text-blue-600 hover:bg-blue-100"
+                  className="flex h-12 items-center justify-center rounded-lg bg-indigo-50 text-lg font-bold text-indigo-600 hover:bg-indigo-100 transition"
                 >
                   {qty}
                 </button>
